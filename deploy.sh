@@ -20,3 +20,5 @@ echo "🔝 Pushing 'latest' tag..."
 docker push "$IMAGE_NAME:latest"
 
 echo "✅ Done! Image is ready at $IMAGE_NAME:latest"
+
+docker system prune -f
