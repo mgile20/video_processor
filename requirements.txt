@@ -1,0 +1,4 @@
+motor
+pydantic-settings
+pymongo
+types_boto3[s3]
