@@ -1,25 +1,27 @@
-import asyncio
+import os
+import shutil
 
-from datetime import datetime
+from pathlib import Path
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from app.logic.worker import Worker
+from app.providers.local_list_provider import LocalListProvider
 
-from app.common.app_context import AppContext
-from app.data.motor_manager import MotorClientManager
-
-AppContext()
-motor_manager = MotorClientManager()
-
-client: AsyncIOMotorClient = motor_manager.get_client()
-db = client.get_database("video_maker")
-collection = db.get_collection("processor")
-
-
-async def run_async():
-    await collection.insert_one({"hello": datetime.now()})
-    count = await collection.count_documents({})
-    print(count)
-
+provider = LocalListProvider(
+    [
+        {
+            "_id": "6999451e0323cf7727ede74a",
+            "project_id": "6997fb28f401a1be515e8f36",
+            "bucket": "video-maker",
+            "key": "6997fb28f401a1be515e8f36/raw/IMG_1076.MP4",
+        }
+    ]
+)
 
 if __name__ == "__main__":
-    asyncio.run(run_async())
+    processing_path = Path("processing")
+    processing_path.mkdir(parents=True, exist_ok=True)
+
+    worker = Worker(provider, processing_path, 5)
+    worker.start()
+
+    shutil.rmtree(processing_path)

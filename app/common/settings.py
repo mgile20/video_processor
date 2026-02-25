@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     minio_url: str
     minio_username: str
     minio_password: str
+    redis_host: str
+    redis_port: int
+    redis_password: str
 
     model_config = SettingsConfigDict(
         secrets_dir="/run/secrets",
