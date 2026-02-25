@@ -2,7 +2,7 @@ import json
 
 from typing import List
 
-from app.models.media_item_model import MediaItemModel
+from app.models.media_item_model import JobModel
 from app.providers.queue_provider import QueueProvider
 
 
@@ -15,12 +15,12 @@ class LocalListProvider(QueueProvider):
     def fetch_job(self):
         return self.queue.pop(0) if self.queue else None
 
-    def complete_job(self, job: MediaItemModel):
+    def complete_job(self, job: JobModel):
         print(f"Job {job.id} finished successfully.")
         if job.id in self.attempts:
             del self.attempts[job.id]
 
-    def fail_job(self, job: MediaItemModel | None, job_data: str):
+    def fail_job(self, job: JobModel | None, job_data: str):
         if not job:
             print("No job, discarding.")
             return

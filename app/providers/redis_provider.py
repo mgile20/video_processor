@@ -1,6 +1,6 @@
 import redis
 
-from app.models.media_item_model import MediaItemModel
+from app.models.media_item_model import JobModel
 from app.providers.queue_provider import QueueProvider
 
 
@@ -19,7 +19,7 @@ class RedisProvider(QueueProvider):
         """
         return self.client.lmove(self.queue, self.processing_queue, src_out="RIGHT", dest_in="LEFT")
 
-    def complete_job(self, job: MediaItemModel):
+    def complete_job(self, job: JobModel):
         """
         Removes the job from the processing queue permanently.
         Pass the full job dictionary to ensure we find the exact match.
@@ -35,7 +35,7 @@ class RedisProvider(QueueProvider):
         else:
             print(f"Warning: Job {job.id} not found in processing queue.")
 
-    def fail_job(self, job: MediaItemModel | None, job_data: str):
+    def fail_job(self, job: JobModel | None, job_data: str):
         """
         Increments a retry counter in Redis and either re-queues or moves to DLQ.
         """

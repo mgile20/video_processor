@@ -6,7 +6,7 @@ from uuid import uuid4
 from app.common.app_context import AppContext
 from app.common.file_manager import FileManager
 from app.logic import ffmpeg_util
-from app.models.media_item_model import MediaItemModel
+from app.models.media_item_model import JobModel
 from app.providers.queue_provider import QueueProvider
 
 AppContext()
@@ -33,18 +33,22 @@ class Worker:
                 break
 
             try:
-                job = MediaItemModel.model_validate_json(job_data)
+                job = JobModel.model_validate_json(job_data)
             except Exception as e:
                 print(f"Failed to parse job data: {e}")
                 self.provider.fail_job(None, job_data)
 
             try:
-                job = MediaItemModel.model_validate_json(job_data)
+                job = JobModel.model_validate_json(job_data)
 
                 file_bytes = file_manager.get_object(job.bucket, job.key)
                 file_path = self.save_to_disk(file_bytes)
-                ffmpeg_util.identify_file(file_path)
+                media_type, metadata = ffmpeg_util.identify_file(file_path)
 
+                print(media_type)
+                print(metadata)
+
+                file_path.unlink()
                 self.provider.complete_job(job)
 
             except Exception as e:

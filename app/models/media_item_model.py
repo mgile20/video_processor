@@ -7,7 +7,7 @@ from pydantic import model_validator
 from app.models.types.object_id import ObjectIdPydantic
 
 
-class MediaItemModel(BaseModel):
+class JobModel(BaseModel):
     id: ObjectIdPydantic = Field(alias="_id")
     project_id: ObjectIdPydantic
     bucket: str

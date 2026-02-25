@@ -1,7 +1,7 @@
 from abc import ABC
 from abc import abstractmethod
 
-from app.models.media_item_model import MediaItemModel
+from app.models.media_item_model import JobModel
 
 
 class QueueProvider(ABC):
@@ -10,11 +10,11 @@ class QueueProvider(ABC):
         pass
 
     @abstractmethod
-    def complete_job(self, job: MediaItemModel):
+    def complete_job(self, job: JobModel):
         pass
 
     @abstractmethod
-    def fail_job(self, job: MediaItemModel | None, job_data: str):
+    def fail_job(self, job: JobModel | None, job_data: str):
         pass
 
     @abstractmethod
