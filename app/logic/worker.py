@@ -1,3 +1,4 @@
+import json
 import time
 
 from pathlib import Path
@@ -6,6 +7,8 @@ from uuid import uuid4
 from app.common.app_context import AppContext
 from app.common.file_manager import FileManager
 from app.logic import ffmpeg_util
+from app.logic.image_processor import ImageProcessor
+from app.logic.video_processor import VideoProcessor
 from app.models.media_item_model import JobModel
 from app.providers.queue_provider import QueueProvider
 
@@ -45,8 +48,10 @@ class Worker:
                 file_path = self.save_to_disk(file_bytes)
                 media_type, metadata = ffmpeg_util.identify_file(file_path)
 
-                print(media_type)
-                print(metadata)
+                if media_type == "image":
+                    ImageProcessor.run(file_path)
+                elif media_type == "video":
+                    VideoProcessor.run(file_path)
 
                 file_path.unlink()
                 self.provider.complete_job(job)
@@ -56,7 +61,8 @@ class Worker:
                 self.provider.fail_job(job, job_data)
 
             # Cooldown logic (only if items remain)
-            if self.provider.has_items():
+            if not self.provider.has_items():
+                print("cooldown...")
                 time.sleep(self.cooldown)
 
         print("All jobs processed or discarded. Worker exiting.")

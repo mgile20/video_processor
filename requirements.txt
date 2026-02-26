@@ -1,6 +1,8 @@
 boto3
 motor
+pillow
 pydantic-settings
 pymongo
+python-dateutil
 redis
 types_boto3[s3]

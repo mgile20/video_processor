@@ -21,9 +21,9 @@ def categorize_file_type(format_name: str):
     image_extensions = {"jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "svg", "heic"}
     video_extensions = {"mp4", "mkv", "mov", "wmv", "flv", "avi", "avchd", "webm", "m4v"}
 
-    if format_name in image_extensions:
+    if any(key in format_name for key in image_extensions):
         return "image"
-    elif format_name in video_extensions:
+    elif any(key in format_name for key in video_extensions):
         return "video"
 
 
@@ -49,8 +49,7 @@ def identify_file(file_path) -> Tuple[str, dict]:
         raise Exception("ffprobe result not dict")
 
     format_name: str = get_nested_value(result_json, "format.format_name", "")
-    first_format: str = format_name.split(",")[0]
 
-    media_type = categorize_file_type(first_format)
+    media_type = categorize_file_type(format_name)
 
     return media_type, result_json
