@@ -1,4 +1,5 @@
 boto3
+fractional_indexing
 motor
 pillow
 pydantic-settings

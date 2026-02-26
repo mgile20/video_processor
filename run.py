@@ -4,13 +4,12 @@ import shutil
 
 from pathlib import Path
 
-from app.common.app_context import AppContext
-from app.data.motor_manager import MotorClientManager
+from bson import ObjectId
+
+from app.data.items import Items
+from app.data.projects import Projects
 from app.logic.worker import Worker
 from app.providers.local_list_provider import LocalListProvider
-
-AppContext()
-motor_manager = MotorClientManager()
 
 provider = LocalListProvider(
     [
@@ -36,11 +35,14 @@ provider = LocalListProvider(
 )
 
 
-async def run_async():
-    items_collection = motor_manager.get_client().get_database("video_maker").get_collection("items")
+async def get_data():
 
     data = []
-    cursor = items_collection.find({}, {"project_id": 1, "bucket": 1, "key": 1})
+    cursor = Items.collection.find(
+        {
+            "project_id": ObjectId("69a06248947603081ae0ff84"),
+        }
+    )
     async for row in cursor:
         data.append(
             {
@@ -54,13 +56,30 @@ async def run_async():
     return data
 
 
-if __name__ == "__main__":
-    # data = asyncio.run(run_async())
-    # provider = LocalListProvider(data)
+async def run_async():
+    data = await get_data()
+
+    provider = LocalListProvider(data)
     processing_path = Path("processing")
     processing_path.mkdir(parents=True, exist_ok=True)
 
     worker = Worker(provider, processing_path, 5)
-    worker.start()
+    await worker.run()
 
     shutil.rmtree(processing_path)
+
+
+async def create_sample_data():
+    await Projects.insert_sample_data()
+    await Items.insert_sample_data()
+
+
+async def create_indexes():
+    await Items.create_indexes()
+    await Items.print_indexes()
+
+
+if __name__ == "__main__":
+    # asyncio.run(create_indexes())
+    # asyncio.run(create_sample_data())
+    asyncio.run(run_async())

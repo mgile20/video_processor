@@ -7,10 +7,12 @@ from uuid import uuid4
 
 from dateutil import parser
 
+from app.models.video_processor_result_model import VideoProcessorResultModel
+
 
 class VideoProcessor:
     @classmethod
-    def _get_created_dt(cls, file_path) -> datetime | None:
+    def _get_captured_dt(cls, file_path) -> datetime | None:
         cmd = [
             "exiftool",
             "-json",
@@ -113,8 +115,8 @@ class VideoProcessor:
 
     @classmethod
     def run(cls, path: Path):
-        created_dt = cls._get_created_dt(path)
-        thumbnail_bytes = cls._generate_thumbnail(path)
-        gif_bytes = cls._generate_time_lapse_gif(path)
-
-        print(created_dt)
+        return VideoProcessorResultModel(
+            thumbnail_bytes=cls._generate_thumbnail(path),
+            gif_bytes=cls._generate_time_lapse_gif(path),
+            captured_at=cls._get_captured_dt(path),
+        )

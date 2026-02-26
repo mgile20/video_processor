@@ -5,6 +5,9 @@ from pathlib import Path
 from dateutil import parser
 from PIL import Image
 from PIL.ExifTags import TAGS
+from PIL.TiffImagePlugin import IFDRational
+
+from app.models.image_processor_result_model import ImageProcessorResultModel
 
 
 class ImageProcessor:
@@ -13,12 +16,17 @@ class ImageProcessor:
         exif_dict = {}
         for tag, value in exif.items():
             decoded = TAGS.get(tag, tag)
-            exif_dict[decoded] = value
+            if isinstance(value, IFDRational):
+                exif_dict[decoded] = float(value)
+            elif isinstance(value, bytes):
+                continue
+            else:
+                exif_dict[decoded] = value
 
         return exif_dict
 
     @classmethod
-    def _get_created_dt(cls, exif: Image.Exif):
+    def _get_captured_dt(cls, exif: Image.Exif):
         try:
             exif_ifd = exif.get_ifd(0x8769)
             dt_str = exif_ifd.get(36867)
@@ -54,8 +62,8 @@ class ImageProcessor:
         image = Image.open(path)
         exif = image.getexif()
 
-        exif_dict = cls._get_exif_data(exif)
-        created_dt = cls._get_created_dt(exif)
-        thumbnail_bytes = cls._generate_thumbnail(image)
-
-        print(created_dt)
+        return ImageProcessorResultModel(
+            exif_data=cls._get_exif_data(exif),
+            thumbnail_bytes=cls._generate_thumbnail(image),
+            captured_at=cls._get_captured_dt(exif),
+        )
