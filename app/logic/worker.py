@@ -48,7 +48,9 @@ class Worker:
                 file_path = self.save_to_disk(file_bytes)
                 media_type, metadata = ffmpeg_util.identify_file(file_path)
 
-                update_data = {}
+                update_data = {
+                    "type": media_type,
+                }
 
                 if media_type == "image":
                     result = ImageProcessor.run(file_path)

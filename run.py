@@ -40,7 +40,8 @@ async def get_data():
     data = []
     cursor = Items.collection.find(
         {
-            "project_id": ObjectId("69a06248947603081ae0ff84"),
+            "project_id": ObjectId("6997fb28f401a1be515e8f36"),  # demo
+            # "project_id": ObjectId("69a06248947603081ae0ff84"), #test
         }
     )
     async for row in cursor:
