@@ -2,6 +2,7 @@ from threading import Lock
 from typing import Optional
 
 from app.common.file_manager import FileManager
+from app.common.redis_manager import RedisManager
 from app.common.settings import settings
 from app.data.motor_manager import MotorClientManager
 
@@ -15,7 +16,10 @@ class AppContext:
             if cls._instance is None:
                 cls._instance = super(AppContext, cls).__new__(cls)
 
+                cls.settings = settings
+
                 FileManager().add_client_config("default", settings.minio_url, settings.minio_username, settings.minio_password)
                 MotorClientManager().add_client_config("default", settings.mongo_uri)
+                RedisManager().add_client_config("default", settings.redis_host, settings.redis_port, settings.redis_password)
 
             return cls._instance

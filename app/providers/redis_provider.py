@@ -5,8 +5,8 @@ from app.providers.queue_provider import QueueProvider
 
 
 class RedisProvider(QueueProvider):
-    def __init__(self, host="localhost", port=6379, queue_name="tasks", retry_limit=3):
-        self.client = redis.Redis(host=host, port=port, decode_responses=True)
+    def __init__(self, client: redis.Redis, queue_name: str, retry_limit=3):
+        self.client = client
         self.queue = queue_name
         self.processing_queue = f"{queue_name}:processing"
         self.retry_limit = retry_limit

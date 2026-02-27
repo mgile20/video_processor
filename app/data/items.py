@@ -15,6 +15,8 @@ from app.models.media_item_model import JobModel
 AppContext()
 motor_manager = MotorClientManager()
 
+INDEXING_DIGITS = "abcdefghijklmnopqrstuvwxyz"
+
 
 class Items:
     aware_utc_options = CodecOptions(tz_aware=True, tzinfo=timezone.utc)
@@ -74,7 +76,7 @@ class Items:
         prev_order = prev_item.get("order") if prev_item else None
         next_order = next_item.get("order") if next_item else None
 
-        new_rank = generate_key_between(prev_order, next_order)
+        new_rank = generate_key_between(prev_order, next_order, INDEXING_DIGITS)
 
         try:
             await cls.collection.update_one({"_id": job.id}, {"$set": {"order": new_rank, "captured_at": captured_at}})

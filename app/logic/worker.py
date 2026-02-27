@@ -55,7 +55,7 @@ class Worker:
                 if media_type == "image":
                     result = ImageProcessor.run(file_path)
                 elif media_type == "video":
-                    result = VideoProcessor.run(file_path)
+                    result = VideoProcessor.run(file_path, metadata)
 
                 if hasattr(result, "thumbnail_bytes"):
                     key = f"{job.project_id}/thumbnail/{job.file_name_no_ext}.jpg"
