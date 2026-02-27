@@ -18,11 +18,34 @@ def categorize_file_type(format_name: str):
         return "video"
 
 
+def is_heif(file_path):
+    try:
+        with open(file_path, "rb") as f:
+            # Read the first 12 bytes
+            header = f.read(12)
+
+            # ISOBMFF files (HEIF/MP4) start with 'ftyp' at offset 4
+            if len(header) < 12 or header[4:8] != b"ftyp":
+                return False
+
+            # Common HEIF brands
+            heif_brands = {b"heic", b"heix", b"hevc", b"hevx", b"mif1", b"msf1"}
+
+            # The major brand is at offset 8
+            major_brand = header[8:12]
+            return major_brand in heif_brands
+    except IOError:
+        return False
+
+
 def identify_file(file_path) -> Tuple[str, dict]:
+    if is_heif(file_path):
+        return "image", {"format": {"format_name": "heic"}}
+
     cmd = [
         "ffprobe",
-        "-v",
-        "quiet",
+        # "-v",
+        # "quiet",
         "-select_streams",
         "v:0",
         "-show_entries",

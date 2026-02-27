@@ -77,8 +77,10 @@ class Worker:
                 self.provider.complete_job(job)
 
             except Exception as e:
-                print(f"Error: {e}")
-                self.provider.fail_job(job, job_data)
+                print(f"Error processing job {job.id}\n{e}")
+                # don't requeue for now, just mark as failed
+                self.provider.fail_job(None, job_data)
+                # self.provider.fail_job(job, job_data)
 
             # Cooldown logic (only if items remain)
             if not self.provider.has_items():

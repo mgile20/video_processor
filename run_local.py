@@ -17,9 +17,11 @@ async def get_data():
     data = []
     cursor = Items.collection.find(
         {
-            "name": "ff0c6ddc86904671a9c5005441c56555.jpg",
+            # "name": "5cdc3f7f85a74f8793680db613529a66.heic",
             # "project_id": ObjectId("6997fb28f401a1be515e8f36"),  # demo
             # "project_id": ObjectId("69a06248947603081ae0ff84"), #test
+            "project_id": ObjectId("69a1c9e727eb84ce903a3b6c"),  # september
+            # "_id": ObjectId("69a1ca6027eb84ce903a3bb8"),
         }
     )
     async for row in cursor:

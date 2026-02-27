@@ -2,6 +2,7 @@ boto3
 fractional_indexing
 motor
 pillow
+pillow-heif
 pydantic-settings
 pymongo
 python-dateutil
