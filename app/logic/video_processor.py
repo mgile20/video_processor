@@ -37,7 +37,7 @@ class VideoProcessor:
                 dt_str = metadata["CreateDate"]
 
             if not dt_str:
-                return dt_str
+                return None
 
             normalized_date = dt_str.replace(":", "-", 2)
             dt_aware = parser.parse(normalized_date)

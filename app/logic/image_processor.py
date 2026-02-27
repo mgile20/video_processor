@@ -1,5 +1,6 @@
 import io
 
+from datetime import datetime
 from pathlib import Path
 
 from dateutil import parser
@@ -26,11 +27,14 @@ class ImageProcessor:
         return exif_dict
 
     @classmethod
-    def _get_captured_dt(cls, exif: Image.Exif):
+    def _get_captured_dt(cls, exif: Image.Exif) -> datetime | None:
         try:
             exif_ifd = exif.get_ifd(0x8769)
             dt_str = exif_ifd.get(36867)
             tz_str = exif_ifd.get(36881)
+
+            if not exif_ifd or not dt_str or not tz_str:
+                return None
 
             full_str = f"{dt_str}{tz_str}" if tz_str else dt_str
             normalized = full_str.replace(":", "-", 2)

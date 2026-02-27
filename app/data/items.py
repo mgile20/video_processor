@@ -26,7 +26,10 @@ class Items:
     collection = database.get_collection("items")
 
     @classmethod
-    async def update_order(cls, job: JobModel, captured_at: datetime) -> str:
+    async def update_order(cls, job: JobModel, captured_at: datetime | None) -> str:
+        if not captured_at:
+            return
+
         prev_item = await cls.collection.find_one(
             {
                 "project_id": job.project_id,

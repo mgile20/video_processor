@@ -11,36 +11,14 @@ from app.data.projects import Projects
 from app.logic.worker import Worker
 from app.providers.local_list_provider import LocalListProvider
 
-provider = LocalListProvider(
-    [
-        # {
-        #     "_id": "6999451e0323cf7727ede74a",
-        #     "project_id": "6997fb28f401a1be515e8f36",
-        #     "bucket": "video-maker",
-        #     "key": "6997fb28f401a1be515e8f36/raw/IMG_1076.MP4",
-        # },
-        {
-            "_id": "6999451e0323cf7727ede74a",
-            "project_id": "6997fb28f401a1be515e8f36",
-            "bucket": "video-maker",
-            "key": "inbox/PXL_20260208_205246673.jpg",
-        },
-        {
-            "_id": "6999451e0323cf7727ede74a",
-            "project_id": "6997fb28f401a1be515e8f36",
-            "bucket": "video-maker",
-            "key": "inbox/PXL_20260117_194436350.mp4",
-        },
-    ]
-)
-
 
 async def get_data():
 
     data = []
     cursor = Items.collection.find(
         {
-            "project_id": ObjectId("6997fb28f401a1be515e8f36"),  # demo
+            "name": "ff0c6ddc86904671a9c5005441c56555.jpg",
+            # "project_id": ObjectId("6997fb28f401a1be515e8f36"),  # demo
             # "project_id": ObjectId("69a06248947603081ae0ff84"), #test
         }
     )
