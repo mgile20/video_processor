@@ -17,7 +17,7 @@ class RedisProvider(QueueProvider):
         Atomically moves a job from main queue to processing queue.
         This prevents data loss if the worker dies during execution.
         """
-        return self.client.lmove(self.queue, self.processing_queue, src_out="RIGHT", dest_in="LEFT")
+        return self.client.lmove(self.queue, self.processing_queue, src="RIGHT", dest="LEFT")
 
     def complete_job(self, job: JobModel):
         """
@@ -69,7 +69,7 @@ class RedisProvider(QueueProvider):
             print(f"Redis: Found {processing_count} orphaned jobs. Recovering...")
 
             while self.client.llen(self.processing_queue) > 0:
-                self.client.lmove(self.processing_queue, self.queue, src_out="LEFT", dest_in="RIGHT")
+                self.client.lmove(self.processing_queue, self.queue, src="LEFT", dest="RIGHT")
             print("Redis: Recovery complete.")
         else:
             print("Redis: No orphaned jobs found.")

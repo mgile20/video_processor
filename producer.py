@@ -32,7 +32,7 @@ def process_queue():
     }
 
     data_string = json.dumps(data)
-    r.lpush(settings.redis_task_queue_name, data_string)
+    r.lpush(settings.redis_processing_queue_name, data_string)
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ redis_client = RedisManager().get_client()
 
 async def run_async():
 
-    provider = RedisProvider(redis_client, app_context.settings.redis_task_queue_name)
+    provider = RedisProvider(redis_client, app_context.settings.redis_processing_queue_name)
     processing_path = Path("processing")
     processing_path.mkdir(parents=True, exist_ok=True)
 

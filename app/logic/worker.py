@@ -38,10 +38,12 @@ class Worker:
 
             try:
                 job_dict = json.loads(job_data)
+                job_dict["raw_context"] = job_data
                 job = JobModel.model_validate(job_dict)
             except Exception as e:
                 print(f"Failed to parse job data: {e}")
                 self.provider.fail_job(None, job_data)
+                continue
 
             try:
                 file_bytes = file_manager.get_object(job.bucket, job.key)
