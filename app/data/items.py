@@ -9,6 +9,7 @@ from bson.codec_options import CodecOptions
 from fractional_indexing import generate_key_between
 
 from app.common.app_context import AppContext
+from app.data import util
 from app.data.motor_manager import MotorClientManager
 from app.models.media_item_model import JobModel
 
@@ -93,8 +94,8 @@ class Items:
 
     @classmethod
     async def create_indexes(cls):
-        await cls.collection.drop_index("neighbor_lookup_idx")
-        await cls.collection.drop_index("unique_project_order_idx")
+        await util.drop_index_safe(cls.collection, "neighbor_lookup_idx")
+        await util.drop_index_safe(cls.collection, "unique_project_order_idx")
 
         neighbor_index = pymongo.IndexModel(
             [
@@ -132,13 +133,13 @@ class Items:
             {
                 "project_id": ObjectId("69a06248947603081ae0ff84"),
                 "bucket": "video-maker",
-                "key": "inbox/PXL_20260208_205246673.jpg",
+                "key": "69a06248947603081ae0ff84/raw/photo.jpg",
                 "created_at": datetime.now(timezone.utc),
             },
             {
                 "project_id": ObjectId("69a06248947603081ae0ff84"),
                 "bucket": "video-maker",
-                "key": "inbox/PXL_20260117_194436350.mp4",
+                "key": "69a06248947603081ae0ff84/raw/video.mp4",
                 "created_at": datetime.now(timezone.utc),
             },
         ]

@@ -17,11 +17,7 @@ async def get_data():
     data = []
     cursor = Items.collection.find(
         {
-            # "name": "5cdc3f7f85a74f8793680db613529a66.heic",
-            # "project_id": ObjectId("6997fb28f401a1be515e8f36"),  # demo
-            # "project_id": ObjectId("69a06248947603081ae0ff84"), #test
-            "project_id": ObjectId("69a1c9e727eb84ce903a3b6c"),  # september
-            # "_id": ObjectId("69a1ca6027eb84ce903a3bb8"),
+            "project_id": ObjectId("69a06248947603081ae0ff84"),
         }
     )
     async for row in cursor:
@@ -50,17 +46,5 @@ async def run_async():
     shutil.rmtree(processing_path)
 
 
-async def create_sample_data():
-    await Projects.insert_sample_data()
-    await Items.insert_sample_data()
-
-
-async def create_indexes():
-    await Items.create_indexes()
-    await Items.print_indexes()
-
-
 if __name__ == "__main__":
-    # asyncio.run(create_indexes())
-    # asyncio.run(create_sample_data())
     asyncio.run(run_async())

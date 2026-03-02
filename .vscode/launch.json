@@ -9,14 +9,30 @@
             "type": "debugpy",
             "request": "launch",
             "program": "run_local.py",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "env": {
+                "environment": "local_dev"
+            }
+        },
+        {
+            "name": "Create Test Data",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "create_test_data.py",
+            "console": "integratedTerminal",
+            "env": {
+                "environment": "local_dev"
+            }
         },
         {
             "name": "Run",
             "type": "debugpy",
             "request": "launch",
             "program": "run.py",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "env": {
+                "environment": "local_dev"
+            }
         }
     ]
 }

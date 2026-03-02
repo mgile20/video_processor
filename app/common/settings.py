@@ -1,5 +1,12 @@
+from os import getenv
+
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
+
+if getenv("environment") == "local_dev":
+    secrets_dir = "~/secrets"
+else:
+    secrets_dir = "/run/secrets"
 
 
 class Settings(BaseSettings):
@@ -13,7 +20,7 @@ class Settings(BaseSettings):
     redis_processing_queue_name: str
 
     model_config = SettingsConfigDict(
-        secrets_dir="/run/secrets",
+        secrets_dir=secrets_dir,
         env_file=".env",
         extra="ignore",
     )

@@ -3,3 +3,4 @@ env
 .env
 temp_uploads
 processing
+media
