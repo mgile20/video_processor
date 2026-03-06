@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 # Copy the rest of the application code
 COPY ./app /code/app
+COPY ./ml_models /code/ml_models
 COPY run.py /code/run.py
 
 CMD ["python", "run.py"]
