@@ -16,6 +16,9 @@ def get_project_root() -> Path:
     """Recursively find the project root by looking for a marker file."""
     current_path = Path(__file__).resolve()
     for parent in [current_path] + list(current_path.parents):
-        if (parent / ".git").exists() or (parent / "pyproject.toml").exists():
+        if (parent / ".git").exists() or (parent / "pyproject.toml").exists() or (parent / "run.py").exists():
             return parent
+
+    print(f"Parent path: {current_path.parent}")
+
     return current_path.parent
