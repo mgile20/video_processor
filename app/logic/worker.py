@@ -69,6 +69,10 @@ class Worker:
                     update_data["gif_key"] = key
                 if hasattr(result, "exif_data"):
                     update_data["exif_data"] = result.exif_data
+                if hasattr(result, "face_data_targets"):
+                    update_data["face_data_targets"] = result.face_data_targets
+                if hasattr(result, "face_data_all"):
+                    update_data["face_data_all"] = result.face_data_all
 
                 await Items.update(job, update_data)
                 await Items.update_order(job, result.captured_at)

@@ -5,6 +5,7 @@ from app.common.file_manager import FileManager
 from app.common.redis_manager import RedisManager
 from app.common.settings import settings
 from app.data.motor_manager import MotorClientManager
+from app.models.paths_model import PathsModel
 
 
 class AppContext:
@@ -21,5 +22,7 @@ class AppContext:
                 FileManager().add_client_config("default", settings.minio_url, settings.minio_username, settings.minio_password)
                 MotorClientManager().add_client_config("default", settings.mongo_uri)
                 RedisManager().add_client_config("default", settings.redis_host, settings.redis_port, settings.redis_password)
+
+                cls.paths = PathsModel.default()
 
             return cls._instance

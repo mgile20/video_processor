@@ -1,6 +1,7 @@
 boto3
 fractional_indexing
 motor
+opencv-contrib-python
 pillow
 pillow-heif
 pydantic-settings

@@ -1,5 +1,5 @@
 # Use an official Python base image
-FROM python:3.13-slim
+FROM python:3.11-slim
 
 RUN apt-get update && \
     apt-get install -y ffmpeg exiftool && \
