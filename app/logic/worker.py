@@ -63,10 +63,10 @@ class Worker:
                     key = f"{job.project_id}/thumbnail/{job.file_name_no_ext}.jpg"
                     file_manager.put_object(job.bucket, key, result.thumbnail_bytes)
                     update_data["thumbnail_key"] = key
-                if hasattr(result, "gif_bytes"):
-                    key = f"{job.project_id}/gif/{job.file_name_no_ext}.gif"
-                    file_manager.put_object(job.bucket, key, result.gif_bytes)
-                    update_data["gif_key"] = key
+                # if hasattr(result, "gif_bytes"):
+                #     key = f"{job.project_id}/gif/{job.file_name_no_ext}.gif"
+                #     file_manager.put_object(job.bucket, key, result.gif_bytes)
+                #     update_data["gif_key"] = key
                 if hasattr(result, "exif_data"):
                     update_data["exif_data"] = result.exif_data
                 if hasattr(result, "face_data_targets"):

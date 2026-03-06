@@ -117,6 +117,6 @@ class VideoProcessor:
     def run(cls, path: Path, metadata: dict):
         return VideoProcessorResultModel(
             thumbnail_bytes=cls._generate_thumbnail(path),
-            gif_bytes=cls._generate_time_lapse_gif(path),
+            # gif_bytes=cls._generate_time_lapse_gif(path),
             captured_at=cls._get_captured_dt(path),
         )
