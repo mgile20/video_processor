@@ -1,0 +1,61 @@
+import os
+
+import ffmpeg
+
+
+def create_highlight_video(input_folder, music_path, output_name="media/output/highlight_reel.mp4"):
+    valid_extensions = (".mp4", ".mov", ".jpg", ".jpeg", ".png")
+    files = sorted([f for f in os.listdir(input_folder) if f.lower().endswith(valid_extensions)])
+
+    if not files:
+        print("No files found.")
+        return
+
+    segments = []
+
+    for file in files:
+        path = os.path.join(input_folder, file)
+        is_image = file.lower().endswith((".jpg", ".jpeg", ".png"))
+
+        if is_image:
+            v = ffmpeg.input(path, loop=1, t=3).video
+            a = ffmpeg.input("anullsrc=channel_layout=stereo:sample_rate=44100", f="lavfi", t=3).audio
+        else:
+            stream = ffmpeg.input(path)
+            v = stream.video
+            a = stream.audio.filter("aresample", 44100)
+
+        v = (
+            v.filter("scale", 1920, 1080, force_original_aspect_ratio="decrease")
+            .filter("pad", 1920, 1080, "(ow-iw)/2", "(oh-ih)/2")
+            .filter("fps", fps=30)
+            .filter("setsar", "1/1")
+        )
+
+        segments.extend([v, a])
+
+    # 1. Join segments
+    joined_node = ffmpeg.concat(*segments, v=1, a=1).node
+    combined_v = joined_node[0]
+    combined_a = joined_node[1]
+
+    # 2. Split audio for triggering and content
+    a_split = combined_a.filter_multi_output("asplit")
+    control_wire = a_split[0]
+    content_wire = a_split[1]
+
+    # 3. Background Music
+    bg_music = ffmpeg.input(music_path, stream_loop=-1).audio.filter("aresample", 44100)
+
+    # 4. Logical Muting (Corrected Ratio)
+    # We use a very low threshold (0.001) so even a whisper in the video kills the music.
+    # We use the max allowed ratio (20).
+    silenced_bg_music = ffmpeg.filter([bg_music, control_wire], "sidechaincompress", threshold=0.001, ratio=20, attack=10, release=10)
+
+    # 5. Final Mix
+    final_audio = ffmpeg.filter([silenced_bg_music, content_wire], "amix", inputs=2)
+
+    # 6. Execute Render
+    os.makedirs(os.path.dirname(output_name), exist_ok=True)
+
+    (ffmpeg.output(combined_v, final_audio, output_name, vcodec="libx264", pix_fmt="yuv420p", acodec="aac", shortest=None).run(overwrite_output=True))

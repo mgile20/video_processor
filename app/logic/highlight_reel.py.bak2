@@ -1,0 +1,80 @@
+import os
+import shutil
+import tempfile
+
+import ffmpeg
+
+
+def create_highlight_video(media_data, music_path, output_name="media/output/highlight_reel.mp4", image_duration: int = 5):
+    temp_dir = tempfile.mkdtemp()
+    intermediate_files = []
+    list_file_path = os.path.join(temp_dir, "concat_list.txt")
+
+    print(f"Stage 1: Normalizing {len(media_data)} clips...")
+
+    try:
+        # --- STAGE 1: Standardize each clip into the temp folder ---
+        for i, item in enumerate(media_data):
+            path = item["path"]
+            media_type = item["type"]
+            temp_output = os.path.join(temp_dir, f"clip_{i:03d}.mp4")
+
+            # Use a single-input graph for each clip
+            input_stream = ffmpeg.input(path) if media_type == "video" else ffmpeg.input(path, loop=1, t=image_duration)
+
+            v = (
+                input_stream.video.filter("scale", 1920, 1080, force_original_aspect_ratio="decrease")
+                .filter("pad", 1920, 1080, "(ow-iw)/2", "(oh-ih)/2")
+                .filter("fps", 30)
+                .filter("format", "yuv420p")
+            )
+
+            if media_type == "image":
+                a = ffmpeg.input("anullsrc=channel_layout=stereo:sample_rate=44100", f="lavfi", t=image_duration).audio
+            else:
+                # Ensure audio is perfectly aligned for concat
+                a = input_stream.audio.filter("aresample", 44100).filter("aformat", sample_fmts="fltp", channel_layouts="stereo")
+
+            (ffmpeg.output(v, a, temp_output, vcodec="libx264", acodec="aac", preset="ultrafast").run(overwrite_output=True, quiet=True))
+
+            print(f"processing {i+1}/{len(media_data)}")
+            intermediate_files.append(temp_output)
+
+        # --- STAGE 2: Create the Concat Text File ---
+        # This is the secret to low memory. FFmpeg reads this line by line.
+        with open(list_file_path, "w") as f:
+            for file_path in intermediate_files:
+                # FFmpeg needs single quotes escaped for the list file
+                safe_path = file_path.replace("'", "'\\''")
+                f.write(f"file '{safe_path}'\n")
+
+        print("Stage 2: Stitching via Demuxer and mixing audio...")
+
+        # 1. We use the concat demuxer as the primary video/audio source
+        # '-f concat' and '-safe 0' are required for local paths
+        main_video_audio = ffmpeg.input(list_file_path, f="concat", safe=0)
+
+        # 2. Setup Background Music
+        bg_music = (
+            ffmpeg.input(music_path, stream_loop=-1).audio.filter("aresample", 44100).filter("aformat", sample_fmts="fltp", channel_layouts="stereo")
+        )
+
+        # 3. Split the concatenated audio for the sidechain trigger
+        # We must split the demuxed audio to avoid "multiple outgoing edges"
+        a_split = main_video_audio.audio.filter_multi_output("asplit")
+        control_wire = a_split[0]
+        content_wire = a_split[1]
+
+        # 4. Ducking and Final Mix
+        silenced_bg = ffmpeg.filter([bg_music, control_wire], "sidechaincompress", threshold=0.01, ratio=20, attack=10, release=10)
+
+        final_a = ffmpeg.filter([silenced_bg, content_wire], "amix", inputs=2, duration="first")
+
+        # 5. Final Output
+        os.makedirs(os.path.dirname(output_name), exist_ok=True)
+        (ffmpeg.output(main_video_audio.video, final_a, output_name, vcodec="libx264", acodec="aac", pix_fmt="yuv420p").run(overwrite_output=True))
+
+        print(f"Success! Output: {output_name}")
+
+    finally:
+        shutil.rmtree(temp_dir)

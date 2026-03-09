@@ -9,3 +9,4 @@ pymongo
 python-dateutil
 redis
 types_boto3[s3]
+ffmpeg-python

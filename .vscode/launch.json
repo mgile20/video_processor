@@ -33,7 +33,17 @@
             "env": {
                 "environment": "local_dev"
             }
-        }
+        },
+        {
+            "name": "run_reel",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "run_reel.py",
+            "console": "integratedTerminal",
+            "env": {
+                "environment": "local_dev"
+            }
+        },
         {
             "name": "Run",
             "type": "debugpy",
