@@ -1,9 +1,6 @@
 import asyncio
 
 from pathlib import Path
-from uuid import uuid4
-
-import cv2
 
 from bson import ObjectId
 
@@ -17,9 +14,10 @@ file_manager = FileManager()
 
 project_root = app_context.paths.project_root
 reel_dir = project_root.joinpath("media/reel")
-audio_path = project_root.joinpath("media/audio/fsm-team-happy-days.mp3")
+audio_dir = project_root.joinpath("media/audio")
 
 reel_dir.mkdir(parents=True, exist_ok=True)
+audio_dir.mkdir(parents=True, exist_ok=True)
 
 
 async def get_images():
@@ -77,6 +75,19 @@ async def get_all():
     return data
 
 
+def get_audio_path():
+    file_name = Path("fbc9f913a1d244c4ab46e143c9c1967d.mp3").name
+    file_path = audio_dir.joinpath(file_name)
+
+    if file_path.exists():
+        return file_path
+
+    file_bytes = file_manager.get_object("video-maker", "audio/fbc9f913a1d244c4ab46e143c9c1967d.mp3")
+    save_to_disk(file_path, file_bytes)
+
+    return file_path
+
+
 def save_to_disk(path: Path, file_bytes: bytes) -> Path:
     with open(path, "wb+") as file:
         file.write(file_bytes)
@@ -85,9 +96,9 @@ def save_to_disk(path: Path, file_bytes: bytes) -> Path:
 
 
 async def run_async():
-    data = await get_all()
-    # data = await get_images()
-    # data.extend(await get_videos())
+    # data = await get_all()
+    data = await get_images()
+    data.extend(await get_videos())
 
     reel_data = []
 
@@ -96,18 +107,20 @@ async def run_async():
             bucket = row["bucket"]
             key = row["key"]
             file_name = Path(key).name
-            # file_bytes = file_manager.get_object(bucket, key)
+            file_bytes = file_manager.get_object(bucket, key)
             file_path = reel_dir.joinpath(file_name)
-            # save_to_disk(file_path, file_bytes)
+            save_to_disk(file_path, file_bytes)
 
             d = {
                 "path": file_path,
                 "type": row["type"],
-                # "faces": [r["box"] for r in row["face_data_targets"] if "face_data_targets" in row],
+                "faces": [r["box"] for r in row.get("face_data_targets", [])],
             }
             reel_data.append(d)
         except Exception as ex:
             print(ex)
+
+    audio_path = get_audio_path()
 
     highlight_reel.create_highlight_video(reel_data, audio_path)
 
