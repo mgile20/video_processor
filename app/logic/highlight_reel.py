@@ -9,10 +9,6 @@ import ffmpeg
 
 
 def process_clip(args):
-    """
-    Stage 1: Normalize clips.
-    Standardizes everything to 1080p, 30fps, and Stereo 44.1kHz.
-    """
     i, item, temp_dir, image_duration = args
     path = item["path"]
     media_type = item["type"]
@@ -20,7 +16,7 @@ def process_clip(args):
 
     if media_type == "video":
         probe = ffmpeg.probe(path)
-        duration = float(probe["format"]["duration"])
+        duration = float(probe["format"].get("duration", 0))
         input_stream = ffmpeg.input(path)
     else:
         duration = image_duration
@@ -31,21 +27,21 @@ def process_clip(args):
         input_stream.video.filter("scale", 1920, 1080, force_original_aspect_ratio="decrease")
         .filter("pad", 1920, 1080, "(ow-iw)/2", "(oh-ih)/2")
         .filter("fps", 30)
+        .filter("setsar", 1)  # Force square pixels to fix the Concat error
         .filter("format", "yuv420p")
     )
 
-    # Audio Normalization (Strictly Stereo 44.1k)
+    # Audio Normalization
     if media_type == "image":
         a = ffmpeg.input("anullsrc=cl=stereo:r=44100", f="lavfi", t=duration).audio
     else:
         try:
             a = (
-                input_stream.audio.filter("aresample", 44100)
+                input_stream.audio.filter("aresample", 44100, **{"async": 1})
                 .filter("aformat", sample_fmts="fltp", channel_layouts="stereo")
                 .filter("atrim", duration=duration)
             )
         except Exception:
-            # Fallback if video has no audio track
             a = ffmpeg.input("anullsrc=cl=stereo:r=44100", f="lavfi", t=duration).audio
 
     (
@@ -65,63 +61,40 @@ def create_highlight_video(
 ):
     temp_dir = tempfile.mkdtemp()
     try:
-        # --- STAGE 1: Parallel Normalization ---
-        print("Stage 1: Normalizing clips...")
+        print("Stage 1: Normalizing clips (Fixing SAR and FPS)...")
         args = [(i, item, temp_dir, image_duration) for i, item in enumerate(media_data)]
-        results = []
         with Pool(cpu_count()) as pool:
-            for res in pool.imap_unordered(process_clip, args):
-                results.append(res)
+            results = list(pool.imap_unordered(process_clip, args))
         results.sort(key=lambda x: x[0])
+        clip_paths = [r[2] for r in results]
 
-        list_file_path = os.path.join(temp_dir, "concat_list.txt")
-        with open(list_file_path, "w") as f:
-            for r in results:
-                f.write(f"file '{r[2]}'\n")
+        print("Stage 2: Concatenating via filter graph...")
+        input_clips = [ffmpeg.input(p) for p in clip_paths]
+        concat_streams = []
+        for c in input_clips:
+            concat_streams.append(c.video)
+            concat_streams.append(c.audio)
 
-        # --- STAGE 2: Flatten Timeline ---
-        # This merges clips into one file to prevent audio drift during the complex mix.
-        print("Stage 2: Merging timeline...")
-        temp_merged = os.path.join(temp_dir, "merged_master.mp4")
-        (ffmpeg.input(list_file_path, f="concat", safe=0).output(temp_merged, c="copy").run(overwrite_output=True, quiet=True))
+        joined = ffmpeg.concat(*concat_streams, v=1, a=1).node
+        v_merged = joined[0]
+        a_merged = joined[1]
 
-        # --- STAGE 3: Natural Sidechain Ducking ---
-        print("Stage 3: Mixing audio with natural ducking...")
-        video_input = ffmpeg.input(temp_merged)
-        music_input = ffmpeg.input(music_path, stream_loop=-1)
+        print("Stage 3: Splitting and Mixing Audio...")
+        a_split = a_merged.filter_multi_output("asplit")
+        a_for_sidechain = a_split[0]
+        a_for_mix = a_split[1]
 
-        # 1. Prepare Music Stream
-        music_audio = music_input.audio.filter("volume", music_base_volume)
+        music_audio = ffmpeg.input(music_path, stream_loop=-1).audio.filter("volume", music_base_volume)
 
-        # 2. Apply Sidechain Compression
-        # Threshold 0.08: Triggers when speech is present
-        # Ratio 4: Subtle, non-robotic reduction
-        # Attack 100ms: Smooth fade out
-        # Release 1200ms: Prevents 'pumping' during pauses in speech
+        smart_music = ffmpeg.filter([music_audio, a_for_sidechain], "sidechaincompress", threshold=0.05, ratio=12, attack=100, release=1500, knee=1.5)
 
-        smart_music = ffmpeg.filter(
-            [music_audio, video_input.audio], "sidechaincompress", threshold=0.05, ratio=12, attack=100, release=1500, knee=1.5
-        )
+        final_audio = ffmpeg.filter([smart_music, a_for_mix], "amix", inputs=2, duration="first").filter("loudnorm", I=-16, LRA=11, TP=-1.5)
 
-        # 3. Final Mix + Limiter
-        # alimiter ensures that adding two loud sounds doesn't cause 'clipping'
-        final_audio = ffmpeg.filter([smart_music, video_input.audio], "amix", inputs=2, duration="first", dropout_transition=0).filter(
-            "loudnorm", I=-16, LRA=11, TP=-1.5
-        )
-
-        # --- STAGE 4: Final Render ---
-        print("Stage 4: Rendering final video...")
+        print("Stage 4: Rendering...")
         os.makedirs(os.path.dirname(output_name), exist_ok=True)
         (
             ffmpeg.output(
-                video_input.video,
-                final_audio,
-                output_name,
-                vcodec="libx264",
-                acodec="aac",
-                pix_fmt="yuv420p",
-                # Use faster preset for testing; change to 'medium' for final quality
-                preset="medium",
+                v_merged, final_audio, output_name, vcodec="libx264", acodec="aac", pix_fmt="yuv420p", preset="medium", movflags="+faststart"
             ).run(overwrite_output=True)
         )
         print(f"\n✨ Success! Video saved to: {output_name}")
@@ -129,13 +102,3 @@ def create_highlight_video(
     finally:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
-
-
-# --- Example of how to run ---
-# if __name__ == "__main__":
-#     my_media = [
-#         {"path": "vids/intro.mp4", "type": "video"},
-#         {"path": "images/photo1.jpg", "type": "image"},
-#         {"path": "vids/interview.mp4", "type": "video"},
-#     ]
-#     create_highlight_video(my_media, "music/background_track.mp3")

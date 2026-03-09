@@ -93,9 +93,9 @@ def save_to_disk(path: Path, file_bytes: bytes) -> Path:
 
 
 async def run_async():
-    # data = await get_all()
-    data = await get_images()
-    data.extend(await get_videos())
+    data = await get_all()
+    # data = await get_images()
+    # data.extend(await get_videos())
 
     reel_data = []
 
