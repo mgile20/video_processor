@@ -61,7 +61,7 @@ def create_highlight_video(
     music_path,
     output_name="media/output/highlight_reel.mp4",
     image_duration: int = 5,
-    music_base_volume: float = 0.5,
+    music_base_volume: float = 0.3,
 ):
     temp_dir = tempfile.mkdtemp()
     try:
@@ -100,13 +100,13 @@ def create_highlight_video(
         # Release 1200ms: Prevents 'pumping' during pauses in speech
 
         smart_music = ffmpeg.filter(
-            [music_audio, video_input.audio], "sidechaincompress", threshold=0.08, ratio=4, attack=100, release=1200, knee=2.5
+            [music_audio, video_input.audio], "sidechaincompress", threshold=0.05, ratio=12, attack=100, release=1500, knee=1.5
         )
 
         # 3. Final Mix + Limiter
         # alimiter ensures that adding two loud sounds doesn't cause 'clipping'
         final_audio = ffmpeg.filter([smart_music, video_input.audio], "amix", inputs=2, duration="first", dropout_transition=0).filter(
-            "alimiter", limit=0.95
+            "loudnorm", I=-16, LRA=11, TP=-1.5
         )
 
         # --- STAGE 4: Final Render ---
