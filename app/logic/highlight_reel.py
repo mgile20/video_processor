@@ -9,12 +9,16 @@ import ffmpeg
 
 
 def process_clip(args):
+    """
+    Stage 1: Normalize every clip to identical specs (1080p, 30fps, Stereo 44.1kHz).
+    This prevents the concat demuxer from glitching due to mismatched streams.
+    """
     i, item, temp_dir, image_duration = args
-
     path = item["path"]
     media_type = item["type"]
     temp_output = os.path.join(temp_dir, f"clip_{i:03d}.mp4")
 
+    # 1. Setup Input
     if media_type == "video":
         probe = ffmpeg.probe(path)
         duration = float(probe["format"]["duration"])
@@ -23,6 +27,7 @@ def process_clip(args):
         duration = image_duration
         input_stream = ffmpeg.input(path, loop=1, t=image_duration)
 
+    # 2. Video Processing (Standardize Resolution & Frame Rate)
     v = (
         input_stream.video.filter("scale", 1920, 1080, force_original_aspect_ratio="decrease")
         .filter("pad", 1920, 1080, "(ow-iw)/2", "(oh-ih)/2")
@@ -30,22 +35,21 @@ def process_clip(args):
         .filter("format", "yuv420p")
     )
 
+    # 3. Audio Processing (Strictly Standardize Sample Rate & Layout)
     if media_type == "image":
-        a = ffmpeg.input(
-            "anullsrc=channel_layout=stereo:sample_rate=44100",
-            f="lavfi",
-            t=duration,
-        ).audio
+        a = ffmpeg.input("anullsrc=cl=stereo:r=44100", f="lavfi", t=duration).audio
     else:
         try:
-            a = input_stream.audio.filter("aresample", 44100).filter("aformat", sample_fmts="fltp", channel_layouts="stereo")
+            # We force 2-channel stereo and 44.1k to ensure amix doesn't fail later
+            a = (
+                input_stream.audio.filter("aresample", 44100)
+                .filter("aformat", sample_fmts="fltp", channel_layouts="stereo")
+                .filter("atrim", duration=duration)  # Ensure audio isn't longer than video
+            )
         except Exception:
-            a = ffmpeg.input(
-                "anullsrc=channel_layout=stereo:sample_rate=44100",
-                f="lavfi",
-                t=duration,
-            ).audio
+            a = ffmpeg.input("anullsrc=cl=stereo:r=44100", f="lavfi", t=duration).audio
 
+    # 4. Output Normalized Clip
     (
         ffmpeg.output(
             v,
@@ -54,6 +58,8 @@ def process_clip(args):
             vcodec="libx264",
             acodec="aac",
             preset="ultrafast",
+            # Ensure the container has valid timestamps
+            video_track_timescale=30000,
         )
         .global_args("-threads", "1")
         .run(overwrite_output=True, quiet=True)
@@ -73,122 +79,85 @@ def create_highlight_video(
     temp_dir = tempfile.mkdtemp()
     intermediate_files = []
     list_file_path = os.path.join(temp_dir, "concat_list.txt")
-
     clip_durations = []
 
-    print(f"Stage 1: Normalizing {len(media_data)} clips...")
-
     try:
-        # -------------------------------------------------------
-        # STAGE 1: Normalize clips (Multiprocessing with Status)
-        # -------------------------------------------------------
-
+        # --- STAGE 1: Normalize clips in parallel ---
+        print(f"Stage 1: Normalizing {len(media_data)} clips...")
         args = [(i, item, temp_dir, image_duration) for i, item in enumerate(media_data)]
-
         results_raw = []
-        total_clips = len(media_data)
 
-        # Using imap_unordered to get results as they finish
         with Pool(cpu_count()) as pool:
             for result in pool.imap_unordered(process_clip, args):
                 results_raw.append(result)
-                # Print progress immediately
-                processed_count = len(results_raw)
-                print(f"Progress: [{processed_count}/{total_clips}] Finished processing index {result[0]}")
+                print(f"  > Processed index {result[0]}")
 
-        # IMPORTANT: imap_unordered returns items as they finish.
-        # We must sort by the original index 'i' to keep the video sequence correct.
         results_raw.sort(key=lambda x: x[0])
-
         for i, media_type, duration, temp_output in results_raw:
             clip_durations.append((media_type, duration))
             intermediate_files.append(temp_output)
 
-        # -------------------------------------------------------
-        # STAGE 2: Build concat list
-        # -------------------------------------------------------
-
         with open(list_file_path, "w") as f:
-            for file_path in intermediate_files:
-                safe_path = file_path.replace("'", "'\\''")
-                f.write(f"file '{safe_path}'\n")
+            for fp in intermediate_files:
+                f.write(f"file '{fp}'\n")
 
-        main_video_audio = ffmpeg.input(list_file_path, f="concat", safe=0)
+        # --- STAGE 2: Flatten the Video (The "Anti-Desync" Step) ---
+        # We merge all normalized clips into one temporary video file before mixing audio.
+        print("Stage 2: Merging normalized clips...")
+        temp_merged_path = os.path.join(temp_dir, "merged_master.mp4")
+        (ffmpeg.input(list_file_path, f="concat", safe=0).output(temp_merged_path, c="copy").run(overwrite_output=True, quiet=True))
 
-        print("\nStage 2: Building music timeline with ducking...")
-
+        # --- STAGE 3: Build Music Timeline ---
+        print("Stage 3: Building music timeline with ducking...")
         music_input = ffmpeg.input(music_path, stream_loop=-1).audio
-
         segments = []
         position = 0
-        i = 0
+        idx = 0
 
-        while i < len(clip_durations):
-            media_type, duration = clip_durations[i]
+        while idx < len(clip_durations):
+            m_type, dur = clip_durations[idx]
 
-            if media_type == "video":
-                seg = (
-                    music_input.filter("atrim", start=position, end=position + duration)
-                    .filter("asetpts", "PTS-STARTPTS")
-                    .filter("volume", quiet_volume)
-                )
-
-                if duration > fade_duration * 2:
-                    seg = seg.filter("afade", t="in", st=0, d=fade_duration)
-                    seg = seg.filter("afade", t="out", st=duration - fade_duration, d=fade_duration)
-
-                segments.append(seg)
-
-                position += duration
-                i += 1
-                continue
-
-            # ----- GROUP CONSECUTIVE PHOTOS -----
-
+            # Logic to group photos so music doesn't "duck" for every single photo
             group_duration = 0
-            j = i
+            is_video = m_type == "video"
 
-            while j < len(clip_durations) and clip_durations[j][0] == "image":
-                group_duration += clip_durations[j][1]
-                j += 1
+            if is_video:
+                group_duration = dur
+                vol = quiet_volume
+                idx += 1
+            else:
+                # Group consecutive images
+                j = idx
+                while j < len(clip_durations) and clip_durations[j][0] == "image":
+                    group_duration += clip_durations[j][1]
+                    j += 1
+                vol = 1.0  # Full volume for photos
+                idx = j
 
-            seg = music_input.filter("atrim", start=position, end=position + group_duration).filter("asetpts", "PTS-STARTPTS")
+            seg = music_input.filter("atrim", start=position, end=position + group_duration).filter("asetpts", "PTS-STARTPTS").filter("volume", vol)
 
             if group_duration > fade_duration * 2:
                 seg = seg.filter("afade", t="in", st=0, d=fade_duration)
                 seg = seg.filter("afade", t="out", st=group_duration - fade_duration, d=fade_duration)
 
             segments.append(seg)
-
             position += group_duration
-            i = j
 
         music_track = ffmpeg.concat(*segments, v=0, a=1)
 
-        # -------------------------------------------------------
-        # STAGE 3: Final Audio Mix
-        # -------------------------------------------------------
+        # --- STAGE 4: Final Mix ---
+        print("Stage 4: Rendering final output...")
+        master_input = ffmpeg.input(temp_merged_path)
 
-        final_audio = ffmpeg.filter(
-            [music_track, main_video_audio.audio],
-            "amix",
-            inputs=2,
-            duration="first",
-        )
+        # amix: inputs=2, duration=first (matches length of the video)
+        # dropout_transition=0 prevents volume drops at the end
+        final_audio = ffmpeg.filter([music_track, master_input.audio], "amix", inputs=2, duration="first", dropout_transition=0)
 
         os.makedirs(os.path.dirname(output_name), exist_ok=True)
-
-        print("Stage 3: Rendering final video...")
-
         (
-            ffmpeg.output(
-                main_video_audio.video,
-                final_audio,
-                output_name,
-                vcodec="libx264",
-                acodec="aac",
-                pix_fmt="yuv420p",
-            ).run(overwrite_output=True)
+            ffmpeg.output(master_input.video, final_audio, output_name, vcodec="libx264", acodec="aac", pix_fmt="yuv420p", shortest=None).run(
+                overwrite_output=True
+            )
         )
 
         print(f"Success! Output: {output_name}")
@@ -196,3 +165,8 @@ def create_highlight_video(
     finally:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
+
+
+# --- Example Usage ---
+# media_items = [{"path": "vid1.mp4", "type": "video"}, {"path": "img1.jpg", "type": "image"}]
+# create_highlight_video(media_items, "background_music.mp3")

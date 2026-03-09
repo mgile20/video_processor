@@ -50,7 +50,7 @@ async def get_videos():
             }
         )
         .sort({"order": 1})
-        .limit(1)
+        .limit(2)
     )
     async for row in cursor:
         data.append(row)
