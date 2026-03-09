@@ -61,14 +61,11 @@ async def get_videos():
 async def get_all():
 
     data = []
-    cursor = (
-        Items.collection.find(
-            {
-                "project_id": ObjectId("69aa657acdf3e772bfe7bb00"),
-            }
-        ).sort({"order": 1})
-        # .limit(10)
-    )
+    cursor = Items.collection.find(
+        {
+            "project_id": ObjectId("69aa657acdf3e772bfe7bb00"),
+        }
+    ).sort({"order": 1})
     async for row in cursor:
         data.append(row)
 
@@ -107,9 +104,9 @@ async def run_async():
             bucket = row["bucket"]
             key = row["key"]
             file_name = Path(key).name
-            file_bytes = file_manager.get_object(bucket, key)
+            # file_bytes = file_manager.get_object(bucket, key)
             file_path = reel_dir.joinpath(file_name)
-            save_to_disk(file_path, file_bytes)
+            # save_to_disk(file_path, file_bytes)
 
             d = {
                 "path": file_path,

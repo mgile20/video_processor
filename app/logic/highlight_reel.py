@@ -80,20 +80,29 @@ def create_highlight_video(
 
     try:
         # -------------------------------------------------------
-        # STAGE 1: Normalize clips (Multiprocessing)
+        # STAGE 1: Normalize clips (Multiprocessing with Status)
         # -------------------------------------------------------
 
         args = [(i, item, temp_dir, image_duration) for i, item in enumerate(media_data)]
 
+        results_raw = []
+        total_clips = len(media_data)
+
+        # Using imap_unordered to get results as they finish
         with Pool(cpu_count()) as pool:
-            results = pool.map(process_clip, args)
+            for result in pool.imap_unordered(process_clip, args):
+                results_raw.append(result)
+                # Print progress immediately
+                processed_count = len(results_raw)
+                print(f"Progress: [{processed_count}/{total_clips}] Finished processing index {result[0]}")
 
-        results.sort(key=lambda x: x[0])
+        # IMPORTANT: imap_unordered returns items as they finish.
+        # We must sort by the original index 'i' to keep the video sequence correct.
+        results_raw.sort(key=lambda x: x[0])
 
-        for i, media_type, duration, temp_output in results:
+        for i, media_type, duration, temp_output in results_raw:
             clip_durations.append((media_type, duration))
             intermediate_files.append(temp_output)
-            print(f"Processed {i + 1}/{len(media_data)}")
 
         # -------------------------------------------------------
         # STAGE 2: Build concat list
@@ -106,7 +115,7 @@ def create_highlight_video(
 
         main_video_audio = ffmpeg.input(list_file_path, f="concat", safe=0)
 
-        print("Stage 2: Building music timeline with ducking...")
+        print("\nStage 2: Building music timeline with ducking...")
 
         music_input = ffmpeg.input(music_path, stream_loop=-1).audio
 
