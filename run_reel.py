@@ -88,6 +88,19 @@ def get_audio_path():
     return file_path
 
 
+def get_asset_path(bucket: str, key: str):
+    file_name = Path(key).name
+    file_path = reel_dir.joinpath(file_name)
+
+    if file_path.exists():
+        return file_path
+
+    file_bytes = file_manager.get_object(bucket, key)
+    save_to_disk(file_path, file_bytes)
+
+    return file_path
+
+
 def save_to_disk(path: Path, file_bytes: bytes) -> Path:
     with open(path, "wb+") as file:
         file.write(file_bytes)
@@ -106,10 +119,7 @@ async def run_async():
         try:
             bucket = row["bucket"]
             key = row["key"]
-            file_name = Path(key).name
-            # file_bytes = file_manager.get_object(bucket, key)
-            file_path = reel_dir.joinpath(file_name)
-            # save_to_disk(file_path, file_bytes)
+            file_path = get_asset_path(bucket, key)
 
             d = {
                 "path": file_path,
