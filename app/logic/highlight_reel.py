@@ -27,11 +27,11 @@ def process_clip(args):
         input_stream.video.filter("scale", 1920, 1080, force_original_aspect_ratio="decrease")
         .filter("pad", 1920, 1080, "(ow-iw)/2", "(oh-ih)/2")
         .filter("fps", 30)
-        .filter("setsar", 1)  # Force square pixels to fix the Concat error
+        .filter("setsar", 1)
         .filter("format", "yuv420p")
     )
 
-    # Audio Normalization
+    # Audio Normalization - Using libmp3lame for Firefox + TV compatibility
     if media_type == "image":
         a = ffmpeg.input("anullsrc=cl=stereo:r=44100", f="lavfi", t=duration).audio
     else:
@@ -44,9 +44,8 @@ def process_clip(args):
         except Exception:
             a = ffmpeg.input("anullsrc=cl=stereo:r=44100", f="lavfi", t=duration).audio
 
-    # Changed acodec to 'ac3' for TV compatibility
     (
-        ffmpeg.output(v, a, temp_output, vcodec="libx264", acodec="ac3", preset="ultrafast")
+        ffmpeg.output(v, a, temp_output, vcodec="libx264", acodec="libmp3lame", preset="ultrafast")
         .global_args("-threads", "1")
         .run(overwrite_output=True, quiet=True)
     )
@@ -58,18 +57,18 @@ def create_highlight_video(
     music_path,
     output_name="media/output/highlight_reel.mp4",
     image_duration: int = 5,
-    music_base_volume: float = 0.2,
+    music_base_volume: float = 0.15,  # Lowered default for a background feel
 ):
     temp_dir = tempfile.mkdtemp()
     try:
-        print("Stage 1: Normalizing clips..")
+        print("Stage 1: Normalizing clips...")
         args = [(i, item, temp_dir, image_duration) for i, item in enumerate(media_data)]
         with Pool(cpu_count()) as pool:
             results = list(pool.imap_unordered(process_clip, args))
         results.sort(key=lambda x: x[0])
         clip_paths = [r[2] for r in results]
 
-        print("Stage 2: Concatenating via filter graph...")
+        print("Stage 2: Concatenating...")
         input_clips = [ffmpeg.input(p) for p in clip_paths]
         concat_streams = []
         for c in input_clips:
@@ -80,38 +79,40 @@ def create_highlight_video(
         v_merged = joined[0]
         a_merged = joined[1]
 
-        print("Stage 3: Splitting and Mixing Audio...")
+        print("Stage 3: Mixing Audio...")
         a_split = a_merged.filter_multi_output("asplit")
         a_for_sidechain = a_split[0]
         a_for_mix = a_split[1]
 
+        # Apply the volume to the music FIRST
         music_audio = ffmpeg.input(music_path, stream_loop=-1).audio.filter("volume", music_base_volume)
 
+        # Sidechaining: The music ducks when people talk
         smart_music = ffmpeg.filter(
             [music_audio, a_for_sidechain],
             "sidechaincompress",
-            threshold=0.015,  # Lower threshold = more sensitive to quiet speech
-            ratio=4,  # Lower ratio = gentler volume reduction (less "aggressive")
-            attack=50,  # Faster attack = music ducks quicker when speech starts
-            release=2000,  # Longer release = music fades back in slowly/naturally
-            knee=2.5,  # Softer knee = smoother transition into compression
+            threshold=0.01,  # More sensitive to picking up voice
+            ratio=8,  # Dips the music more aggressively when voice is present
+            attack=50,
+            release=1500,
+            knee=2.5,
         )
 
-        final_audio = ffmpeg.filter([smart_music, a_for_mix], "amix", inputs=2, duration="first").filter("loudnorm", I=-16, LRA=11, TP=-1.5)
+        # Mixing and Normalizing
+        # Note: If music is still too loud, lower music_base_volume further (e.g., 0.05)
+        final_audio = ffmpeg.filter([smart_music, a_for_mix], "amix", inputs=2, duration="first").filter("loudnorm", I=-16, TP=-1.5)
 
         print("Stage 4: Rendering...")
         os.makedirs(os.path.dirname(output_name), exist_ok=True)
-
-        # Final render using AC3 and a standard bitrate
         (
             ffmpeg.output(
                 v_merged,
                 final_audio,
                 output_name,
                 vcodec="libx264",
-                acodec="libmp3lame",  # Switched to MP3
+                acodec="libmp3lame",
                 audio_bitrate="192k",
-                ar="44100",  # Standard MP3 sample rate
+                ar="44100",
                 pix_fmt="yuv420p",
                 preset="medium",
                 movflags="+faststart",
