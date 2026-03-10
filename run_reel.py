@@ -63,7 +63,7 @@ async def get_all():
     data = []
     cursor = Items.collection.find(
         {
-            "project_id": ObjectId("69aa657acdf3e772bfe7bb00"),
+            "project_id": ObjectId("69afbdac7b2b1e2d1f6b7ba6"),
         }
     ).sort({"order": 1})
     async for row in cursor:
@@ -109,9 +109,9 @@ def save_to_disk(path: Path, file_bytes: bytes) -> Path:
 
 
 async def run_async():
-    # data = await get_all()
-    data = await get_images()
-    data.extend(await get_videos())
+    data = await get_all()
+    # data = await get_images()
+    # data.extend(await get_videos())
 
     reel_data = []
 
