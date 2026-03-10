@@ -26,7 +26,7 @@ async def get_images():
     cursor = (
         Items.collection.find(
             {
-                "project_id": ObjectId("69aa657acdf3e772bfe7bb00"),
+                "project_id": ObjectId("69af953262162437daba001d"),
                 "type": "image",
             }
         )
@@ -45,12 +45,12 @@ async def get_videos():
     cursor = (
         Items.collection.find(
             {
-                "project_id": ObjectId("69aa657acdf3e772bfe7bb00"),
+                "project_id": ObjectId("69af953262162437daba001d"),
                 "type": "video",
             }
         )
         .sort({"order": 1})
-        .limit(2)
+        .limit(4)
     )
     async for row in cursor:
         data.append(row)
@@ -73,13 +73,16 @@ async def get_all():
 
 
 def get_audio_path():
-    file_name = Path("fbc9f913a1d244c4ab46e143c9c1967d.mp3").name
+
+    file_name = Path("710137c6582b468d835a3e4ca1207773.mp3").name
     file_path = audio_dir.joinpath(file_name)
 
     if file_path.exists():
         return file_path
 
-    file_bytes = file_manager.get_object("video-maker", "audio/fbc9f913a1d244c4ab46e143c9c1967d.mp3")
+    key = Path.joinpath(Path("audio"), file_name)
+
+    file_bytes = file_manager.get_object("video-maker", str(key))
     save_to_disk(file_path, file_bytes)
 
     return file_path
@@ -93,9 +96,9 @@ def save_to_disk(path: Path, file_bytes: bytes) -> Path:
 
 
 async def run_async():
-    data = await get_all()
-    # data = await get_images()
-    # data.extend(await get_videos())
+    # data = await get_all()
+    data = await get_images()
+    data.extend(await get_videos())
 
     reel_data = []
 

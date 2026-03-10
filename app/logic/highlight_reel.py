@@ -44,8 +44,9 @@ def process_clip(args):
         except Exception:
             a = ffmpeg.input("anullsrc=cl=stereo:r=44100", f="lavfi", t=duration).audio
 
+    # Changed acodec to 'ac3' for TV compatibility
     (
-        ffmpeg.output(v, a, temp_output, vcodec="libx264", acodec="aac", preset="ultrafast")
+        ffmpeg.output(v, a, temp_output, vcodec="libx264", acodec="ac3", preset="ultrafast")
         .global_args("-threads", "1")
         .run(overwrite_output=True, quiet=True)
     )
@@ -57,11 +58,11 @@ def create_highlight_video(
     music_path,
     output_name="media/output/highlight_reel.mp4",
     image_duration: int = 5,
-    music_base_volume: float = 0.3,
+    music_base_volume: float = 0.2,
 ):
     temp_dir = tempfile.mkdtemp()
     try:
-        print("Stage 1: Normalizing clips (Fixing SAR and FPS)...")
+        print("Stage 1: Normalizing clips..")
         args = [(i, item, temp_dir, image_duration) for i, item in enumerate(media_data)]
         with Pool(cpu_count()) as pool:
             results = list(pool.imap_unordered(process_clip, args))
@@ -86,15 +87,34 @@ def create_highlight_video(
 
         music_audio = ffmpeg.input(music_path, stream_loop=-1).audio.filter("volume", music_base_volume)
 
-        smart_music = ffmpeg.filter([music_audio, a_for_sidechain], "sidechaincompress", threshold=0.05, ratio=12, attack=100, release=1500, knee=1.5)
+        smart_music = ffmpeg.filter(
+            [music_audio, a_for_sidechain],
+            "sidechaincompress",
+            threshold=0.015,  # Lower threshold = more sensitive to quiet speech
+            ratio=4,  # Lower ratio = gentler volume reduction (less "aggressive")
+            attack=50,  # Faster attack = music ducks quicker when speech starts
+            release=2000,  # Longer release = music fades back in slowly/naturally
+            knee=2.5,  # Softer knee = smoother transition into compression
+        )
 
         final_audio = ffmpeg.filter([smart_music, a_for_mix], "amix", inputs=2, duration="first").filter("loudnorm", I=-16, LRA=11, TP=-1.5)
 
         print("Stage 4: Rendering...")
         os.makedirs(os.path.dirname(output_name), exist_ok=True)
+
+        # Final render using AC3 and a standard bitrate
         (
             ffmpeg.output(
-                v_merged, final_audio, output_name, vcodec="libx264", acodec="aac", pix_fmt="yuv420p", preset="medium", movflags="+faststart"
+                v_merged,
+                final_audio,
+                output_name,
+                vcodec="libx264",
+                acodec="libmp3lame",  # Switched to MP3
+                audio_bitrate="192k",
+                ar="44100",  # Standard MP3 sample rate
+                pix_fmt="yuv420p",
+                preset="medium",
+                movflags="+faststart",
             ).run(overwrite_output=True)
         )
         print(f"\n✨ Success! Video saved to: {output_name}")
