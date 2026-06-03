@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     redis_port: int
     redis_password: str
     redis_processing_queue_name: str
+    reel_sync_drift_tolerance_ms: float = 40.0
+    reel_sync_enable_async_resample: bool = False
+    reel_sync_enable_diagnostics: bool = True
+    reel_sync_music_offset_seconds: float = 0.0
 
     model_config = SettingsConfigDict(
         secrets_dir=secrets_dir,
